@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+option java_package = "org.venus.raft.generator";
+option java_outer_classname = "HeartBeat";
+
+message HeartBeatRequest {
+  // 客户端ID
+  string client_id = 1;
+
+  // 当前时间戳（可选）
+  int64 timestamp = 2;
+}
+
+// 心跳响应消息
+message HeartBeatResponse {
+  // 服务器状态
+  bool server_alive = 1;
+
+  // 服务器时间戳
+  int64 server_timestamp = 2;
+}
