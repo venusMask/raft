@@ -1,21 +1,48 @@
 syntax = "proto3";
 
+import "google/protobuf/empty.proto";
+
 option java_package = "org.venus.raft.generator";
 option java_outer_classname = "HeartBeat";
 
-message HeartBeatRequest {
-  // 客户端ID
-  string client_id = 1;
+service HeartBeatService {
 
-  // 当前时间戳（可选）
-  int64 timestamp = 2;
+  rpc sendHeartBeat (stream HeartBeatMessage) returns (stream HeartBeatMessage);
+
+  // rpc sendHeartBeat (stream HeartBeatRequest) returns (stream HeartBeatResponse);
+
+  rpc askLeader (google.protobuf.Empty) returns (LeaderResponse);
+
 }
+
+message HeartBeatMessage {
+  uint32 type = 1;
+  uint64 term = 2;
+  string message = 3;
+}
+
+message LeaderResponse {
+  uint32 leader_id = 1;
+}
+
+
+//message HeartBeatRequest {
+//
+//  // 当前leader的任期号
+//  uint64 term = 1;
+//
+//}
+//
+//message SubscribeHeartBeat {
+//
+//}
+
+
 
 // 心跳响应消息
-message HeartBeatResponse {
-  // 服务器状态
-  bool server_alive = 1;
-
-  // 服务器时间戳
-  int64 server_timestamp = 2;
-}
+//message HeartBeatResponse {
+//
+//  // 服务器状态
+//  bool alive = 1;
+//
+//}
