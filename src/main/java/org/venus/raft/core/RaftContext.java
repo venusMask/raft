@@ -4,11 +4,15 @@ import lombok.Getter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.venus.raft.args.RaftConfiguration;
-import org.venus.raft.heartbeat.RepHeartBeatServer;
-import org.venus.raft.heartbeat.SendHeartBeatClient;
+import org.venus.raft.election.server.ElectionServer;
+import org.venus.raft.election.client.SendHeartBeatClient;
 import org.venus.raft.utils.Tuple2;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
 
 @Getter
@@ -26,7 +30,7 @@ public class RaftContext {
 
     private final AtomicLong term = new AtomicLong(0L);
 
-    private final RepHeartBeatServer grpcService;
+    private final ElectionServer grpcService;
 
     private NodeIdentification leader = null;
 
@@ -37,8 +41,14 @@ public class RaftContext {
 
     /**
      * 集群中实际运行的节点, 此节点可能会动态的进行增加或者删除
+     * 线程安全的
      */
-    private final List<NodeIdentification> clusterNodes;
+    private final List<NodeIdentification> aliveNodes;
+
+    /**
+     * 存储所有的心跳线程信息
+     */
+    private final Map<Integer, ExecutorService> hbThread = new ConcurrentHashMap<>();
 
     private final Map<Integer, NodeIdentification> clusterMapping;
 
@@ -46,11 +56,11 @@ public class RaftContext {
         this.configuration = configuration;
         this.currentNodeID = configuration.getNodeID();
         heartBeatService = new HeartBeatService(configuration);
-        clusterNodes = configuration.getClusterNodes();
-        clusterMapping = new HashMap<>(clusterNodes.size());
-        initClusterMapping(clusterNodes);
+        aliveNodes = new CopyOnWriteArrayList<>(configuration.getClusterNodes());
+        clusterMapping = new HashMap<>(aliveNodes.size());
+        initClusterMapping(aliveNodes);
         currentNode = clusterMapping.get(currentNodeID);
-        this.grpcService = new RepHeartBeatServer(this);
+        this.grpcService = new ElectionServer(this);
     }
 
     public void startGrpcServer() {
@@ -71,9 +81,9 @@ public class RaftContext {
      *          此时当前节点可以直接将自己变成leader
      */
     public Tuple2<Integer, NodeIdentification> randomAsk(int lastAskIndex) {
-        for (int i = lastAskIndex + 1; i < clusterNodes.size(); i++) {
-            if(!Objects.equals(clusterNodes.get(i).getNodeID(), currentNodeID)) {
-                return Tuple2.of(i, clusterNodes.get(i));
+        for (int i = lastAskIndex + 1; i < aliveNodes.size(); i++) {
+            if(!Objects.equals(aliveNodes.get(i).getNodeID(), currentNodeID)) {
+                return Tuple2.of(i, aliveNodes.get(i));
             }
         }
         return null;
@@ -97,11 +107,10 @@ public class RaftContext {
      * @param votes The number of election votes held by the current node.
      */
     public boolean moreThanHalf(int votes) {
-        return votes >= clusterNodes.size() / 2;
+        return votes >= aliveNodes.size() / 2;
     }
 
     public void switchLeader() {
-        logger.info("将自身节点切换为leader...");
         this.role = Role.LEADER;
         this.leader = clusterMapping.get(currentNodeID);
     }
@@ -122,22 +131,47 @@ public class RaftContext {
         }
     }
 
+    /**
+     * leader节点给所有的存活节点发送心跳信息
+     */
     public void sendHeartBeat() {
-        ArrayList<SendHeartBeatClient> clients = new ArrayList<>();
-        for (NodeIdentification node : clusterNodes) {
+        for (NodeIdentification node : aliveNodes) {
             if(!isLeader(node)) {
-                String host = node.getHost();
-                Integer port = node.getPort();
-                try {
-                    clients.add(SendHeartBeatClient.newInstance(host, port, this));
-                } catch (Exception e) {
-                    System.out.println("bbbb");
-                }
+                hbThreadAdd(node);
             }
         }
-        for (SendHeartBeatClient client : clients) {
-            client.sendHeartBeat();
-        }
+    }
+
+    private void hbThreadAdd(NodeIdentification node) {
+        SendHeartBeatClient client = new SendHeartBeatClient(node, this);
+        ExecutorService executor = Executors.newSingleThreadExecutor();
+        hbThread.put(node.getNodeID(), executor);
+        executor.submit(client);
+    }
+
+    /**
+     * 当一个节点跟leader失去连接的时候调用该方法
+     * 从存活节点中删除,
+     * 删除心跳线程
+     * @param nodeID
+     */
+    public void removeClient(Integer nodeID) {
+        aliveNodes.remove(clusterMapping.get(nodeID));
+        ExecutorService service = hbThread.get(nodeID);
+        hbThread.remove(service);
+        service.shutdown();
+    }
+
+    /**
+     * 一个新节点申请加入集群
+     * TODO: 该方法存在问题, 当相邻的节点快速进行启动的时候, aliveNodes中可能会存在重复节点, aliveNodes改成map存储
+     *
+     * @param nodeID    新节点的编号
+     */
+    public void addNewNode(Integer nodeID) {
+        NodeIdentification node = clusterMapping.get(nodeID);
+        aliveNodes.add(node);
+        hbThreadAdd(node);
     }
 
 }

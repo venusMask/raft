@@ -22,10 +22,10 @@ public class RaftConfiguration {
     private RaftConfiguration() {}
 
     @Getter
-    private Long minElectionTimeout = 150L;
+    private Long minElectionTimeout = 1500L;
 
     @Getter
-    private Long maxElectionTimeout = 300L;
+    private Long maxElectionTimeout = 3000L;
 
     @Getter
     private Long heartBeatGap = 100L;

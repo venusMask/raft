@@ -2,47 +2,32 @@ syntax = "proto3";
 
 import "google/protobuf/empty.proto";
 
-option java_package = "org.venus.raft.generator";
-option java_outer_classname = "HeartBeat";
+option java_package = "org.venus.raft.election.generator";
+option java_outer_classname = "Election";
 
-service HeartBeatService {
+service ElectionService {
 
   rpc sendHeartBeat (stream HeartBeatMessage) returns (stream HeartBeatMessage);
 
-  // rpc sendHeartBeat (stream HeartBeatRequest) returns (stream HeartBeatResponse);
+  rpc askLeader (google.protobuf.Empty) returns (LeaderMessage);
 
-  rpc askLeader (google.protobuf.Empty) returns (LeaderResponse);
+  rpc joinCluster (JoinRequest) returns (google.protobuf.Empty);
 
 }
 
+// 节点新加入集群的时候发送给leader表示自己已经准备好接受leader的心跳请求了
+message JoinRequest {
+  uint32 node_id = 1;
+}
+
+// leader和follower之间互相发送心跳的packet, 当前信息不全
 message HeartBeatMessage {
   uint32 type = 1;
   uint64 term = 2;
   string message = 3;
 }
 
-message LeaderResponse {
+// 新加入的节点向其他节点请求leader的信息
+message LeaderMessage {
   uint32 leader_id = 1;
 }
-
-
-//message HeartBeatRequest {
-//
-//  // 当前leader的任期号
-//  uint64 term = 1;
-//
-//}
-//
-//message SubscribeHeartBeat {
-//
-//}
-
-
-
-// 心跳响应消息
-//message HeartBeatResponse {
-//
-//  // 服务器状态
-//  bool alive = 1;
-//
-//}

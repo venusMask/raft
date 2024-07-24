@@ -1,7 +1,7 @@
-package org.venus.raft.heartbeat;
+package org.venus.raft.utils;
 
 import org.slf4j.Logger;
-import org.venus.raft.generator.HeartBeat;
+import org.venus.raft.election.generator.Election;
 
 /**
  * @Author venus
@@ -10,16 +10,16 @@ import org.venus.raft.generator.HeartBeat;
  */
 public class LogUtil {
 
-    public static void console(HeartBeat.HeartBeatMessage message, String role) {
+    public static void console(Election.HeartBeatMessage message, String role) {
         System.out.printf("***** Message From %s Begin *****\n", role);
         System.out.println(message.getMessage());
         System.out.println(message.getTerm());
         System.out.println(message.getTerm());
-        System.out.printf("***** Message From %s END\n *****", role);
+        System.out.printf("***** Message From %s END ***** \n", role);
     }
 
     public static void info(Logger logger,
-                            HeartBeat.HeartBeatMessage message,
+                            Election.HeartBeatMessage message,
                             String role) {
         logger.info("***** Message From {} Begin *****", role);
         logger.info(message.getMessage());

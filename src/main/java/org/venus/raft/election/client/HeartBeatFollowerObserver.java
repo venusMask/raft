@@ -1,33 +1,31 @@
-package org.venus.raft.heartbeat;
+package org.venus.raft.election.client;
 
 import io.grpc.stub.StreamObserver;
 import lombok.AllArgsConstructor;
 import org.venus.raft.core.RaftContext;
-import org.venus.raft.generator.HeartBeat;
+import org.venus.raft.election.generator.Election;
 import org.venus.raft.service.HeartBeatType;
+import org.venus.raft.utils.LogUtil;
 
 /**
- * follower处理来自leader的心跳包
- *
- * @Author venus
- * @Date 2024/7/23
- * @Version 1.0
+ * Follower handles heartbeat packets from leader.
  */
 @AllArgsConstructor
-public class HBServerObserver
-        implements StreamObserver<HeartBeat.HeartBeatMessage> {
+public class HeartBeatFollowerObserver
+        implements StreamObserver<Election.HeartBeatMessage> {
 
-    private final StreamObserver<HeartBeat.HeartBeatMessage> responseObserver;
+    private final StreamObserver<Election.HeartBeatMessage> responseObserver;
 
     private final RaftContext context;
 
     @Override
-    public void onNext(HeartBeat.HeartBeatMessage message) {
+    public void onNext(Election.HeartBeatMessage message) {
         int messageType = message.getType();
+        System.out.println("message type: " + messageType);
         if(messageType == HeartBeatType.HEARTBEAT.type) {
             context.getHeartBeatService().resetCountDownTimer();
             LogUtil.console(message, "Leader");
-            HeartBeat.HeartBeatMessage responseMessage = HeartBeat.HeartBeatMessage
+            Election.HeartBeatMessage responseMessage = Election.HeartBeatMessage
                     .newBuilder()
                     .setType(HeartBeatType.ALIVE.type)
                     .setTerm(-1)
